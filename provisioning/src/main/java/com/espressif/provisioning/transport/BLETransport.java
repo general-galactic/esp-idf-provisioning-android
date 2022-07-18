@@ -140,7 +140,7 @@ public class BLETransport implements Transport {
         } else {
             bluetoothGatt = this.currentDevice.connectGatt(context, false, gattCallback);
         }
-        bluetoothGatt.requestMtu(512)
+        bluetoothGatt.requestMtu(512);
     }
 
     /**
