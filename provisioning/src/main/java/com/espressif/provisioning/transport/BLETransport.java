@@ -53,7 +53,7 @@ public class BLETransport implements Transport {
 
     private Context context;
     private BluetoothDevice currentDevice;
-    private BluetoothGatt bluetoothGatt;
+    public BluetoothGatt bluetoothGatt;
     private BluetoothGattService service;
     private ResponseListener currentResponseListener;
     private Semaphore transportToken;
