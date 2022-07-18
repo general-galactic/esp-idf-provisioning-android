@@ -140,6 +140,7 @@ public class BLETransport implements Transport {
         } else {
             bluetoothGatt = this.currentDevice.connectGatt(context, false, gattCallback);
         }
+        bluetoothGatt.requestMtu(512)
     }
 
     /**
@@ -373,7 +374,7 @@ public class BLETransport implements Transport {
                 bluetoothGatt.readCharacteristic(characteristic);
             } else {
                 if (currentResponseListener != null) {
-                    currentResponseListener.onFailure(new Exception("Write to BLE failed"));
+                    currentResponseListener.onFailure(new Exception(String.format("Write to BLE failed; status=%d", status)));
 //                    EventBus.getDefault().post(new DeviceProvEvent(LibConstants.EVENT_DEVICE_COMMUNICATION_FAILED));
                 }
                 transportToken.release();
