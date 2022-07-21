@@ -161,7 +161,7 @@ public class BleScanner {
         public void onScanFailed(int errorCode) {
             super.onScanFailed(errorCode);
             Log.e(TAG, "onScanFailed, errorCode:" + errorCode);
-            bleScanListener.onFailure(new RuntimeException("BLE scanning failed with errorCode=%d" + errorCode));
+            bleScanListener.onFailure(new RuntimeException("BLE scanning failed with errorCode=" + errorCode));
         }
     };
 }
