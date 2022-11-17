@@ -191,7 +191,7 @@ public class BLETransport implements Transport {
 
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 Log.e(TAG, "Connected to GATT server.");
-                gatt.discoverServices();
+                gatt.requestMtu(512);
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 Log.e(TAG, "Disconnected from GATT server.");
                 EventBus.getDefault().post(new DeviceConnectionEvent(ESPConstants.EVENT_DEVICE_DISCONNECTED));
@@ -292,6 +292,7 @@ public class BLETransport implements Transport {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 Log.d(TAG, "Supported MTU = " + mtu);
             }
+            gatt.discoverServices();
         }
 
         @Override
@@ -318,8 +319,8 @@ public class BLETransport implements Transport {
                     JSONObject jsonObject = new JSONObject(data);
                     JSONObject provInfo = jsonObject.getJSONObject("prov");
 
-                    String versionInfo = provInfo.getString("ver");
-                    Log.d(TAG, "Device Version : " + versionInfo);
+                    String deviceVersion = provInfo.getString("ver");
+                    Log.d(TAG, "Device Version : " + deviceVersion);
 
                     JSONArray capabilities = provInfo.getJSONArray("cap");
 

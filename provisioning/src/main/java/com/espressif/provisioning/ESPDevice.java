@@ -14,6 +14,8 @@
 
 package com.espressif.provisioning;
 
+import static java.lang.Thread.sleep;
+
 import android.Manifest;
 import android.bluetooth.BluetoothDevice;
 import android.content.Context;
@@ -41,6 +43,7 @@ import com.espressif.provisioning.listeners.WiFiScanListener;
 import com.espressif.provisioning.security.Security;
 import com.espressif.provisioning.security.Security0;
 import com.espressif.provisioning.security.Security1;
+import com.espressif.provisioning.security.Security2;
 import com.espressif.provisioning.transport.BLETransport;
 import com.espressif.provisioning.transport.SoftAPTransport;
 import com.espressif.provisioning.transport.Transport;
@@ -62,8 +65,6 @@ import espressif.WifiConfig;
 import espressif.WifiConstants;
 import espressif.WifiScan;
 
-import static java.lang.Thread.sleep;
-
 /**
  * ESPDevice class to hold device information. This will give facility to connect device, send data to device and
  * do provisioning of it.
@@ -82,10 +83,13 @@ public class ESPDevice {
     private WiFiScanListener wifiScanListener;
     private ProvisionListener provisionListener;
     private ResponseListener responseListener;
+
+    // Transport & security type must be set before session init.
     private ESPConstants.TransportType transportType;
     private ESPConstants.SecurityType securityType;
 
     private String proofOfPossession = "";
+    private String userName = "";
     private String versionInfo;
     private int totalCount;
     private int startIndex;
@@ -184,7 +188,7 @@ public class ESPDevice {
     @RequiresPermission(allOf = {Manifest.permission.CHANGE_WIFI_STATE, Manifest.permission.ACCESS_WIFI_STATE, Manifest.permission.ACCESS_NETWORK_STATE, Manifest.permission.ACCESS_FINE_LOCATION})
     public void connectWiFiDevice(String ssid, String password) {
 
-        Log.e(TAG, "connectWiFiDevice ========== SSID : " + ssid + " and Password : " + password);
+        Log.d(TAG, "connectWiFiDevice ========== SSID : " + ssid + " and Password : " + password);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
 
@@ -344,6 +348,24 @@ public class ESPDevice {
     }
 
     /**
+     * This method is used to set username. It is used for Sec2 security type.
+     *
+     * @param username Username.
+     */
+    public void setUserName(String username) {
+        this.userName = username;
+    }
+
+    /**
+     * This method is used to get username. It is used for Sec2 security type.
+     *
+     * @return Returns Username.
+     */
+    public String getUserName() {
+        return userName;
+    }
+
+    /**
      * This method is used to get version information to determine what features are enabled in a device and act accordingly.
      *
      * @return Returns device version information.
@@ -405,6 +427,16 @@ public class ESPDevice {
      */
     public ESPConstants.SecurityType getSecurityType() {
         return securityType;
+    }
+
+    /**
+     * This method is used to set / change security type.
+     * This should be call before session creation.
+     *
+     * @return Returns security type.
+     */
+    public void setSecurityType(ESPConstants.SecurityType secType) {
+        securityType = secType;
     }
 
     /**
@@ -557,26 +589,76 @@ public class ESPDevice {
 
     public void initSession(final ResponseListener listener) {
 
-        if (securityType.equals(ESPConstants.SecurityType.SECURITY_0)) {
-            security = new Security0();
-        } else {
-            security = new Security1(proofOfPossession);
+        try {
+            JSONObject jsonObject = new JSONObject(getVersionInfo());
+            JSONObject provInfo = jsonObject.getJSONObject("prov");
+
+            String deviceVersion = provInfo.getString("ver");
+            Log.d(TAG, "Device Version : " + deviceVersion);
+            Log.d(TAG, "sec_ver value : " + provInfo.optInt("sec_ver"));
+            Log.d(TAG, "Has sec_ver key : " + provInfo.has("sec_ver"));
+
+            if (provInfo.has("sec_ver")) {
+
+                int serVer = provInfo.optInt("sec_ver");
+                Log.d(TAG, "Security Version : " + serVer);
+
+                switch (serVer) {
+                    case 0:
+                        securityType = ESPConstants.SecurityType.SECURITY_0;
+                        break;
+                    case 1:
+                        securityType = ESPConstants.SecurityType.SECURITY_1;
+                        break;
+                    case 2:
+                    default:
+                        securityType = ESPConstants.SecurityType.SECURITY_2;
+                        break;
+                }
+            } else {
+                Log.e(TAG, "Older firmware as Sec version not found.");
+                if (securityType == ESPConstants.SecurityType.SECURITY_2) {
+                    securityType = ESPConstants.SecurityType.SECURITY_1;
+                }
+            }
+        } catch (JSONException e) {
+            e.printStackTrace();
+            Log.d(TAG, "Capabilities JSON not available.");
         }
 
-        session = new Session(transport, security);
+        try {
+            Log.d(TAG, "Init session with : " + securityType);
 
-        session.init(null, new Session.SessionListener() {
-
-            @Override
-            public void OnSessionEstablished() {
-                listener.onSuccess(null);
+            switch (securityType) {
+                case SECURITY_0:
+                    security = new Security0();
+                    break;
+                case SECURITY_1:
+                    security = new Security1(proofOfPossession);
+                    break;
+                case SECURITY_2:
+                    security = new Security2(userName, proofOfPossession);
+                    break;
             }
 
-            @Override
-            public void OnSessionEstablishFailed(Exception e) {
-                listener.onFailure(e);
-            }
-        });
+            session = new Session(transport, security);
+
+            session.init(null, new Session.SessionListener() {
+
+                @Override
+                public void OnSessionEstablished() {
+                    listener.onSuccess(null);
+                }
+
+                @Override
+                public void OnSessionEstablishFailed(Exception e) {
+                    listener.onFailure(e);
+                }
+            });
+        } catch (Exception e) {
+            e.printStackTrace();
+            listener.onFailure(e);
+        }
     }
 
     private void sendData(final String path, byte[] data, final ResponseListener listener) {
@@ -644,7 +726,7 @@ public class ESPDevice {
 
     private void getFullWiFiList() {
 
-        Log.e(TAG, "Total count : " + totalCount + " and start index is : " + startIndex);
+        Log.d(TAG, "Total count : " + totalCount + " and start index is : " + startIndex);
 
         if (totalCount < 4) {
 
@@ -892,11 +974,11 @@ public class ESPDevice {
             WifiScan.WiFiScanPayload payload = WifiScan.WiFiScanPayload.parseFrom(responseData);
             final WifiScan.RespScanResult response = payload.getRespScanResult();
 
-            Log.e(TAG, "Response count : " + response.getEntriesCount());
+            Log.d(TAG, "Response count : " + response.getEntriesCount());
 
             for (int i = 0; i < response.getEntriesCount(); i++) {
 
-                Log.e(TAG, "SSID : " + response.getEntries(i).getSsid().toStringUtf8());
+                Log.d(TAG, "SSID : " + response.getEntries(i).getSsid().toStringUtf8());
                 String ssid = response.getEntries(i).getSsid().toStringUtf8();
                 int rssi = response.getEntries(i).getRssi();
                 boolean isAvailable = false;
@@ -924,7 +1006,7 @@ public class ESPDevice {
                     wifiApList.add(wifiAp);
                 }
 
-                Log.e(TAG, "Size of  list : " + wifiApList.size());
+                Log.d(TAG, "Size of  list : " + wifiApList.size());
             }
 
             startIndex = startIndex + 4;
@@ -1134,7 +1216,7 @@ public class ESPDevice {
             ssid = wifiInfo.getSSID();
             ssid = ssid.replace("\"", "");
         }
-        Log.e(TAG, "Returning ssid : " + ssid);
+        Log.d(TAG, "Returning ssid : " + ssid);
         return ssid;
     }
 

@@ -17,7 +17,9 @@ package com.espressif.provisioning;
 import android.Manifest;
 import android.app.Activity;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanResult;
+import android.bluetooth.le.ScanSettings;
 import android.content.Context;
 import android.os.Build;
 import android.os.Handler;
@@ -165,7 +167,8 @@ public class ESPProvisionManager {
                         String deviceName = jsonObject.optString("name");
                         String pop = jsonObject.optString("pop");
                         String transport = jsonObject.optString("transport");
-                        int security = jsonObject.optInt("security", 1);
+                        int security = jsonObject.optInt("security", ESPConstants.SecurityType.SECURITY_2.ordinal());
+                        String userName = jsonObject.optString("username");
                         String password = jsonObject.optString("password");
                         isScanned = true;
 
@@ -203,15 +206,12 @@ public class ESPProvisionManager {
                             qrCodeScanListener.onFailure(new RuntimeException("Transport is not available"));
                         }
 
-                        if (security == 0) {
-                            securityType = ESPConstants.SecurityType.SECURITY_0;
-                        } else {
-                            securityType = ESPConstants.SecurityType.SECURITY_1;
-                        }
+                        securityType = setSecurityType(security);
 
                         espDevice = new ESPDevice(context, transportType, securityType);
                         espDevice.setDeviceName(deviceName);
                         espDevice.setProofOfPossession(pop);
+                        espDevice.setUserName(userName);
 
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && transportType.equals(ESPConstants.TransportType.TRANSPORT_SOFTAP)) {
 
@@ -264,7 +264,8 @@ public class ESPProvisionManager {
                         String deviceName = jsonObject.optString("name");
                         String pop = jsonObject.optString("pop");
                         String transport = jsonObject.optString("transport");
-                        int security = jsonObject.optInt("security", 1);
+                        int security = jsonObject.optInt("security", ESPConstants.SecurityType.SECURITY_2.ordinal());
+                        String userName = jsonObject.optString("username");
                         String password = jsonObject.optString("password");
                         isScanned = true;
 
@@ -305,15 +306,12 @@ public class ESPProvisionManager {
                             return;
                         }
 
-                        if (security == 0) {
-                            securityType = ESPConstants.SecurityType.SECURITY_0;
-                        } else {
-                            securityType = ESPConstants.SecurityType.SECURITY_1;
-                        }
+                        securityType = setSecurityType(security);
 
                         espDevice = new ESPDevice(context, transportType, securityType);
                         espDevice.setDeviceName(deviceName);
                         espDevice.setProofOfPossession(pop);
+                        espDevice.setUserName(userName);
 
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && transportType.equals(ESPConstants.TransportType.TRANSPORT_SOFTAP)) {
 
@@ -341,12 +339,55 @@ public class ESPProvisionManager {
     /**
      * This method is used to scan BLE devices.
      *
+     * @param filters            The scan filters that will be used
+     * @param bleScannerListener BleScanListener for scanning callbacks.
+     */
+    @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_ADMIN, Manifest.permission.BLUETOOTH, Manifest.permission.ACCESS_FINE_LOCATION})
+    public void searchBleEspDevices(List<ScanFilter> filters, BleScanListener bleScannerListener) {
+
+        Log.d(TAG, "Search for BLE devices");
+        bleScanner = new BleScanner(context, bleScannerListener);
+        bleScanner.startScan(filters);
+    }
+
+    /**
+     * This method is used to scan BLE devices.
+     *
+     * @param scanSettings       The scan settings that will be used
+     * @param bleScannerListener BleScanListener for scanning callbacks.
+     */
+    @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_ADMIN, Manifest.permission.BLUETOOTH, Manifest.permission.ACCESS_FINE_LOCATION})
+    public void searchBleEspDevices(ScanSettings scanSettings, BleScanListener bleScannerListener) {
+
+        Log.d(TAG, "Search for BLE devices");
+        bleScanner = new BleScanner(context, bleScannerListener);
+        bleScanner.startScan(scanSettings);
+    }
+
+    /**
+     * This method is used to scan BLE devices.
+     *
+     * @param filters            The scan filters that will be used
+     * @param scanSettings       The scan settings that will be used
+     * @param bleScannerListener BleScanListener for scanning callbacks.
+     */
+    @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_ADMIN, Manifest.permission.BLUETOOTH, Manifest.permission.ACCESS_FINE_LOCATION})
+    public void searchBleEspDevices(List<ScanFilter> filters, ScanSettings scanSettings, BleScanListener bleScannerListener) {
+
+        Log.d(TAG, "Search for BLE devices");
+        bleScanner = new BleScanner(context, bleScannerListener);
+        bleScanner.startScan(filters, scanSettings);
+    }
+
+    /**
+     * This method is used to scan BLE devices.
+     *
      * @param bleScannerListener BleScanListener for scanning callbacks.
      */
     @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_ADMIN, Manifest.permission.BLUETOOTH, Manifest.permission.ACCESS_FINE_LOCATION})
     public void searchBleEspDevices(BleScanListener bleScannerListener) {
 
-        Log.e(TAG, "Search for BLE devices");
+        Log.d(TAG, "Search for BLE devices");
         bleScanner = new BleScanner(context, bleScannerListener);
         bleScanner.startScan();
     }
@@ -360,7 +401,7 @@ public class ESPProvisionManager {
     @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_ADMIN, Manifest.permission.BLUETOOTH, Manifest.permission.ACCESS_FINE_LOCATION})
     public void searchBleEspDevices(String prefix, BleScanListener bleScannerListener) {
 
-        Log.e(TAG, "Search for BLE devices");
+        Log.d(TAG, "Search for BLE devices");
         bleScanner = new BleScanner(context, prefix, bleScannerListener);
         bleScanner.startScan();
     }
@@ -419,6 +460,18 @@ public class ESPProvisionManager {
         // Check device is available in scanning.
         SearchDeviceTask searchDeviceTask = new SearchDeviceTask(device, password, qrCodeScanListener);
         handler.post(searchDeviceTask);
+    }
+
+    private ESPConstants.SecurityType setSecurityType(int security) {
+        switch (security) {
+            case 0:
+                return ESPConstants.SecurityType.SECURITY_0;
+            case 1:
+                return ESPConstants.SecurityType.SECURITY_1;
+            case 2:
+            default:
+                return ESPConstants.SecurityType.SECURITY_2;
+        }
     }
 
     class SearchDeviceTask implements Runnable {
