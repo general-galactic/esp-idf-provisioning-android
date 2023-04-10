@@ -364,6 +364,8 @@ public class BLETransport implements Transport {
 
                             if (!"021aff55-0382-4aea-bff4-6b3f1c5adfb4".equals(characteristic.getUuid().toString())) {
                                 responseListener.onSuccess(charValue);
+                            } else {
+                                bluetoothGatt.readCharacteristic(characteristic);
                             }
                         }
                     });
