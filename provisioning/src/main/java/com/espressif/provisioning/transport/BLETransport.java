@@ -29,6 +29,7 @@ import android.util.Log;
 import com.espressif.provisioning.DeviceConnectionEvent;
 import com.espressif.provisioning.ESPConstants;
 import com.espressif.provisioning.listeners.ResponseListener;
+import com.espressif.provisioning.utils.HexEncoder;
 
 import org.greenrobot.eventbus.EventBus;
 import org.json.JSONArray;
@@ -309,6 +310,7 @@ public class BLETransport implements Transport {
                                          int status) {
 
             Log.d(TAG, "onCharacteristicRead, status " + status + " UUID : " + characteristic.getUuid().toString());
+
             super.onCharacteristicRead(gatt, characteristic, status);
 
             if (uuidMap.get((ESPConstants.HANDLER_PROTO_VER)).equals(characteristic.getUuid().toString())) {
@@ -353,7 +355,13 @@ public class BLETransport implements Transport {
                         @Override
                         public void run() {
                             currentResponseListener = null;
+
+                            int readLength = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT32, 0);
+                            Log.d(TAG, "Read characteristic int value: " + readLength);
+
                             byte[] charValue = characteristic.getValue();
+                            Log.d(TAG, "Read characteristic value: " + HexEncoder.byteArrayToHexString(charValue));
+
                             responseListener.onSuccess(charValue);
                         }
                     });
