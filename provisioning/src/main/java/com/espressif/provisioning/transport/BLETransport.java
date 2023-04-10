@@ -140,7 +140,9 @@ public class BLETransport implements Transport {
         } else {
             bluetoothGatt = this.currentDevice.connectGatt(context, false, gattCallback);
         }
-        bluetoothGatt.requestMtu(512); // Force the client and server to negotiate an MTU. Long writes fail if not negotiated.
+        Log.d(TAG, "Requesting MTU change to " + 512);
+        boolean success = bluetoothGatt.requestMtu(512); // Force the client and server to negotiate an MTU. Long writes fail if not negotiated.
+        Log.d(TAG, "Requested MTU change to " + 512 + "; success=" + success);
     }
 
     /**
@@ -191,7 +193,9 @@ public class BLETransport implements Transport {
 
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 Log.e(TAG, "Connected to GATT server.");
-                gatt.requestMtu(512);
+                boolean success = gatt.requestMtu(512);
+                Log.d(TAG, "Requested MTU change to " + 512 + "; success=" + success);
+
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 Log.e(TAG, "Disconnected from GATT server.");
                 EventBus.getDefault().post(new DeviceConnectionEvent(ESPConstants.EVENT_DEVICE_DISCONNECTED));
@@ -289,9 +293,7 @@ public class BLETransport implements Transport {
         @Override
         public void onMtuChanged(BluetoothGatt gatt, int mtu, int status) {
             super.onMtuChanged(gatt, mtu, status);
-            if (status == BluetoothGatt.GATT_SUCCESS) {
-                Log.d(TAG, "Supported MTU = " + mtu);
-            }
+            Log.d(TAG, "onMtuChanged: mtu=" + mtu + "; status=" + status);
             gatt.discoverServices();
         }
 
