@@ -362,7 +362,9 @@ public class BLETransport implements Transport {
                             byte[] charValue = characteristic.getValue();
                             Log.d(TAG, "Read characteristic value: " + HexEncoder.byteArrayToHexString(charValue));
 
-                            //responseListener.onSuccess(charValue);
+                            if (!"021aff55-0382-4aea-bff4-6b3f1c5adfb4".equals(characteristic.getUuid().toString())) {
+                                responseListener.onSuccess(charValue);
+                            }
                         }
                     });
                 } else {
