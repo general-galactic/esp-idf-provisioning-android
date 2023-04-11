@@ -356,17 +356,9 @@ public class BLETransport implements Transport {
                         public void run() {
                             currentResponseListener = null;
 
-                            int readLength = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT32, 0);
-                            Log.d(TAG, "Read characteristic int value: " + readLength);
-
                             byte[] charValue = characteristic.getValue();
                             Log.d(TAG, "Read characteristic value: " + HexEncoder.byteArrayToHexString(charValue));
-
-                            if (!"021aff55-0382-4aea-bff4-6b3f1c5adfb4".equals(characteristic.getUuid().toString())) {
-                                responseListener.onSuccess(charValue);
-                            } else {
-                                bluetoothGatt.readCharacteristic(characteristic);
-                            }
+                            responseListener.onSuccess(charValue);
                         }
                     });
                 } else {
